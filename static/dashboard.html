@@ -5,46 +5,253 @@
 <title>FunnelIQ — Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
-  body { font-family: system-ui, sans-serif; background: #f4f7fb; margin: 0; padding: 40px; }
-  .card { background: #fff; padding: 28px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 480px; }
-  h1 { font-size: 22px; margin: 0 0 4px; color: #1a2230; }
-  .muted { color: #6b7890; font-size: 14px; }
-  .stat { font-size: 32px; font-weight: 800; color: #2f6bff; margin: 16px 0; }
-  button { padding: 8px 16px; border: 1px solid #dde5f0; border-radius: 6px; background: #fff; cursor: pointer; }
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --line: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --model-xgboost: #2a78d6;
+    --model-lightgbm: #eb6834;
+    --model-catboost: #1baf7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --surface: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --line: #2c2c2a;
+      --border: rgba(255,255,255,0.10);
+      --model-xgboost: #3987e5;
+      --model-lightgbm: #d95926;
+      --model-catboost: #199e70;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page); color: var(--text-primary);
+    margin: 0; padding: 32px; display: flex; justify-content: center;
+  }
+  .wrap { width: 100%; max-width: 920px; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 28px; }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .topbar h1 { font-size: 20px; margin: 0; }
+  .who { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+
+  button { font-family: inherit; padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-primary); cursor: pointer; font-size: 14px; }
+  button.primary { background: var(--model-xgboost); color: #fff; border: none; }
+  button:hover { filter: brightness(0.97); }
+
+  .stat-tile .label { font-size: 12px; color: var(--text-secondary); }
+  .stat-tile .value { font-size: 34px; font-weight: 600; margin-top: 4px; }
+
+  h2 { font-size: 15px; margin: 0 0 4px; }
+  .section-sub { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+
+  .model-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 760px) { .model-grid { grid-template-columns: 1fr; } }
+
+  .model-card { border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .model-name { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 12px; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+
+  .metric-row { margin-bottom: 12px; }
+  .metric-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .metric-label b { color: var(--text-primary); font-variant-numeric: tabular-nums; font-weight: 600; }
+  .bar-track { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; display: block; }
+
+  .feature-list { margin-top: 14px; }
+  .feature-list .flabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px; }
+  .feature-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .feature-row .fname { width: 46%; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feature-row .bar-track { flex: 1; height: 6px; }
+  .feature-row .fval { width: 32px; text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  .form-groups { display: flex; flex-direction: column; gap: 16px; margin-bottom: 18px; }
+  .form-group .glabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 8px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .form-grid label { display: flex; flex-direction: column; font-size: 12px; color: var(--text-secondary); gap: 4px; text-transform: capitalize; }
+  .form-grid input { padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-primary); font-size: 13px; font-family: inherit; }
+
+  .predict-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .predictions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .pred-tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 18px; text-align: center; min-width: 110px; }
+  .pred-tile .pmodel { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+  .pred-tile .pval { font-size: 24px; font-weight: 600; }
+  .pred-tile .punit { font-size: 11px; color: var(--text-muted); }
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>FunnelIQ Dashboard</h1>
-    <p class="muted" id="who">Loading…</p>
-    <p class="muted">Records in funnel_marketing_data:</p>
-    <div class="stat" id="count">—</div>
+<div class="wrap">
+
+  <div class="card topbar">
+    <div>
+      <h1>FunnelIQ</h1>
+      <div class="who" id="who">Loading…</div>
+    </div>
     <button id="signOut">Sign out</button>
   </div>
 
-  <script src="/config.js"></script>
-  <script>
-    const client = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  <div class="card">
+    <div class="stat-tile">
+      <div class="label">Records in funnel_marketing_data</div>
+      <div class="value" id="count">—</div>
+    </div>
+  </div>
 
-    async function init() {
-      const { data: { session } } = await client.auth.getSession();
-      if (!session) {
-        window.location.href = "/";
-        return;
-      }
-      document.getElementById("who").textContent = "Signed in as " + session.user.email;
+  <div class="card">
+    <h2>Lifetime model comparison</h2>
+    <div class="section-sub">5-fold cross-validation on ltv_months — lower RMSE / higher R² is better</div>
+    <div class="model-grid" id="modelGrid"></div>
+  </div>
 
-      const { count, error } = await client
-        .from("funnel_marketing_data")
-        .select("*", { count: "exact", head: true });
-      document.getElementById("count").textContent = error ? "error" : count;
-    }
-    init();
+  <div class="card">
+    <h2>Predict a new customer's lifetime</h2>
+    <div class="section-sub">Adjust the funnel inputs and compare all three models' predictions</div>
+    <div class="form-groups" id="featureGroups"></div>
+    <div class="predict-row">
+      <button class="primary" id="predictBtn">Predict</button>
+      <div class="predictions" id="predictions"></div>
+    </div>
+  </div>
 
-    document.getElementById("signOut").addEventListener("click", async () => {
-      await client.auth.signOut();
-      window.location.href = "/";
+</div>
+
+<script src="/config.js"></script>
+<script>
+  const client = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  let accessToken = null;
+
+  const MODEL_COLORS = {
+    XGBoost: "var(--model-xgboost)",
+    LightGBM: "var(--model-lightgbm)",
+    CatBoost: "var(--model-catboost)",
+  };
+
+  const FEATURE_GROUPS = [
+    { label: "Ad spend & leads", features: ["ad_budget", "num_leads", "leads_answered", "leads_not_answered"] },
+    { label: "Follow-ups", features: ["followup_1", "followup_2", "followup_3", "followup_4", "followup_5"] },
+    { label: "Calls & cost", features: ["not_closed", "closed", "calls_to_closed", "calls_to_not_closed", "customer_acquisition_cost"] },
+  ];
+
+  async function apiGet(path) {
+    const res = await fetch(path, { headers: { Authorization: "Bearer " + accessToken } });
+    return res.json();
+  }
+  async function apiPost(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + accessToken },
+      body: JSON.stringify(body),
     });
-  </script>
+    return res.json();
+  }
+
+  function renderModelCards(data) {
+    const rmseMax = Math.max(...Object.values(data.comparison).map((c) => c.rmse_mean)) * 1.15;
+    const grid = document.getElementById("modelGrid");
+    grid.innerHTML = Object.entries(data.comparison).map(([name, c]) => {
+      const color = MODEL_COLORS[name] || "var(--text-secondary)";
+      const rmsePct = Math.min(100, (c.rmse_mean / rmseMax) * 100);
+      const r2Pct = Math.min(100, c.r2_mean * 100);
+      const features = c.top_features.slice(0, 3);
+      const maxImp = features.length ? features[0].importance : 1;
+      return `
+        <div class="model-card">
+          <div class="model-name"><span class="swatch" style="background:${color}"></span>${name}</div>
+
+          <div class="metric-row">
+            <div class="metric-label"><span>RMSE (months)</span><b>${c.rmse_mean.toFixed(2)} ± ${c.rmse_std.toFixed(2)}</b></div>
+            <div class="bar-track"><span class="bar-fill" style="width:${rmsePct}%;background:${color}"></span></div>
+          </div>
+
+          <div class="metric-row">
+            <div class="metric-label"><span>R²</span><b>${c.r2_mean.toFixed(3)} ± ${c.r2_std.toFixed(3)}</b></div>
+            <div class="bar-track"><span class="bar-fill" style="width:${r2Pct}%;background:${color}"></span></div>
+          </div>
+
+          <div class="feature-list">
+            <div class="flabel">Top features</div>
+            ${features.map((f) => `
+              <div class="feature-row">
+                <span class="fname">${f.feature}</span>
+                <span class="bar-track"><span class="bar-fill" style="width:${(f.importance / maxImp) * 100}%;background:${color}"></span></span>
+                <span class="fval">${(f.importance * 100).toFixed(0)}%</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderFeatureForm(defaults) {
+    const wrap = document.getElementById("featureGroups");
+    wrap.innerHTML = FEATURE_GROUPS.map((group) => `
+      <div class="form-group">
+        <div class="glabel">${group.label}</div>
+        <div class="form-grid">
+          ${group.features.map((f) => `
+            <label>${f.replace(/_/g, " ")}
+              <input type="number" step="any" data-feature="${f}" value="${defaults[f]}">
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderPredictions(preds) {
+    document.getElementById("predictions").innerHTML = Object.entries(preds).map(([name, months]) => `
+      <div class="pred-tile">
+        <div class="pmodel"><span class="swatch" style="background:${MODEL_COLORS[name] || "var(--text-secondary)"}"></span>${name}</div>
+        <div class="pval">${months}</div>
+        <div class="punit">months</div>
+      </div>
+    `).join("");
+  }
+
+  async function init() {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session) {
+      window.location.href = "/";
+      return;
+    }
+    accessToken = session.access_token;
+    document.getElementById("who").textContent = "Signed in as " + session.user.email;
+
+    const { count, error } = await client
+      .from("funnel_marketing_data")
+      .select("*", { count: "exact", head: true });
+    document.getElementById("count").textContent = error ? "error" : count.toLocaleString();
+
+    const data = await apiGet("/api/lifetime/comparison");
+    renderModelCards(data);
+    renderFeatureForm(data.feature_defaults);
+  }
+  init();
+
+  document.getElementById("predictBtn").addEventListener("click", async () => {
+    const inputs = document.querySelectorAll("#featureGroups input");
+    const features = {};
+    inputs.forEach((el) => (features[el.dataset.feature] = parseFloat(el.value)));
+    const preds = await apiPost("/api/lifetime/predict", features);
+    renderPredictions(preds);
+  });
+
+  document.getElementById("signOut").addEventListener("click", async () => {
+    await client.auth.signOut();
+    window.location.href = "/";
+  });
+</script>
 </body>
 </html>
