@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>FunnelIQ — Sign in</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f4f7fb; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+  .card { background: #fff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 320px; }
+  h1 { font-size: 20px; margin: 0 0 20px; color: #1a2230; }
+  input { width: 100%; padding: 10px; margin: 6px 0; border: 1px solid #dde5f0; border-radius: 6px; box-sizing: border-box; }
+  button { width: 100%; padding: 10px; margin-top: 10px; border: none; border-radius: 6px; background: #2f6bff; color: #fff; font-weight: 600; cursor: pointer; }
+  button.secondary { background: #fff; color: #2f6bff; border: 1px solid #2f6bff; }
+  #error { color: #d64545; font-size: 13px; margin-top: 8px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>FunnelIQ — sign in</h1>
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+    <button id="signIn">Sign in</button>
+    <button id="signUp" class="secondary">Create account</button>
+    <div id="error"></div>
+  </div>
+
+  <script src="/config.js"></script>
+  <script>
+    const client = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+    async function redirectIfSignedIn() {
+      const { data: { session } } = await client.auth.getSession();
+      if (session) window.location.href = "/dashboard";
+    }
+    redirectIfSignedIn();
+
+    function showError(err) {
+      document.getElementById("error").textContent = err ? err.message : "";
+    }
+
+    document.getElementById("signIn").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      if (!email || !password) return showError({ message: "Enter an email and password first." });
+      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (error) return showError(error);
+      window.location.href = "/dashboard";
+    });
+
+    document.getElementById("signUp").addEventListener("click", async () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      if (!email || !password) return showError({ message: "Enter an email and password first." });
+      const { error } = await client.auth.signUp({ email, password });
+      if (error) return showError(error);
+      showError({ message: "Account created — check your email if confirmation is required, then sign in." });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>FunnelIQ — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; background: #f4f7fb; margin: 0; padding: 40px; }
+  .card { background: #fff; padding: 28px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); max-width: 480px; }
+  h1 { font-size: 22px; margin: 0 0 4px; color: #1a2230; }
+  .muted { color: #6b7890; font-size: 14px; }
+  .stat { font-size: 32px; font-weight: 800; color: #2f6bff; margin: 16px 0; }
+  button { padding: 8px 16px; border: 1px solid #dde5f0; border-radius: 6px; background: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>FunnelIQ Dashboard</h1>
+    <p class="muted" id="who">Loading…</p>
+    <p class="muted">Records in funnel_marketing_data:</p>
+    <div class="stat" id="count">—</div>
+    <button id="signOut">Sign out</button>
+  </div>
+
+  <script src="/config.js"></script>
+  <script>
+    const client = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+
+    async function init() {
+      const { data: { session } } = await client.auth.getSession();
+      if (!session) {
+        window.location.href = "/";
+        return;
+      }
+      document.getElementById("who").textContent = "Signed in as " + session.user.email;
+
+      const { count, error } = await client
+        .from("funnel_marketing_data")
+        .select("*", { count: "exact", head: true });
+      document.getElementById("count").textContent = error ? "error" : count;
+    }
+    init();
+
+    document.getElementById("signOut").addEventListener("click", async () => {
+      await client.auth.signOut();
+      window.location.href = "/";
+    });
+  </script>
+</body>
+</html>
