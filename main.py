@@ -28,7 +28,7 @@ def require_auth(authorization: str = Header(None)):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    lifetime_models.train()
+    lifetime_models.load()
     yield
 
 

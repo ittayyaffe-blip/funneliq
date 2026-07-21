@@ -4,5 +4,4 @@ __pycache__/
 venv/
 .env
 catboost_info/
-model_lifetime_*
 uvicorn.log

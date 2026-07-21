@@ -1,18 +1,28 @@
 """
 Shared training/serving logic for the Package 2 lifetime models (XGBoost,
-LightGBM, CatBoost). Trained once at API startup from the CSV already in
-the repo - no separate model-artifact files to keep in sync.
+LightGBM, CatBoost).
+
+Training (LifetimeModels.train) is slow - 5-fold CV across 3 gradient
+boosting models - and must NOT run at API startup: it blocked every
+request (including /health) long enough for Railway's proxy to 502 before
+the app ever became ready. Instead, train_lifetime_model.py runs it once
+offline and saves small artifacts under artifacts/; the API just loads
+them (LifetimeModels.load), which is near-instant.
 """
+import json
+import os
+
 import numpy as np
 import pandas as pd
 from catboost import CatBoostRegressor
-from lightgbm import LGBMRegressor
+from lightgbm import Booster, LGBMRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import KFold
 from xgboost import XGBRegressor
 
 DATA_PATH = "funnel_marketing_data.csv"
 TARGET = "ltv_months"
+ARTIFACT_DIR = "artifacts"
 
 # ponytail: leakage columns excluded per design discussion - cumulative_profit
 # is derived from tenure itself, upsell/referred happen during the
@@ -61,6 +71,18 @@ def cross_validate(model, X, y, folds=5):
     return np.array(rmses), np.array(r2s)
 
 
+class _LightGBMBooster:
+    """Wraps a loaded LightGBM Booster so it exposes .predict(df) like the
+    sklearn regressor does - keeps LifetimeModels.predict() uniform across
+    all three libraries."""
+
+    def __init__(self, booster):
+        self._booster = booster
+
+    def predict(self, X):
+        return self._booster.predict(X)
+
+
 class LifetimeModels:
     def __init__(self):
         self.models = {}
@@ -87,6 +109,33 @@ class LifetimeModels:
                     for f, v in top5.items()
                 ],
             }
+
+    def save(self):
+        os.makedirs(ARTIFACT_DIR, exist_ok=True)
+        self.models["XGBoost"].save_model(f"{ARTIFACT_DIR}/lifetime_xgboost.json")
+        self.models["LightGBM"].booster_.save_model(f"{ARTIFACT_DIR}/lifetime_lightgbm.txt")
+        self.models["CatBoost"].save_model(f"{ARTIFACT_DIR}/lifetime_catboost.cbm")
+        with open(f"{ARTIFACT_DIR}/lifetime_comparison.json", "w") as fh:
+            json.dump(
+                {"comparison": self.comparison, "feature_defaults": self.feature_defaults},
+                fh, indent=2,
+            )
+
+    def load(self):
+        with open(f"{ARTIFACT_DIR}/lifetime_comparison.json") as fh:
+            data = json.load(fh)
+        self.comparison = data["comparison"]
+        self.feature_defaults = data["feature_defaults"]
+
+        xgb_model = XGBRegressor()
+        xgb_model.load_model(f"{ARTIFACT_DIR}/lifetime_xgboost.json")
+
+        lgb_booster = _LightGBMBooster(Booster(model_file=f"{ARTIFACT_DIR}/lifetime_lightgbm.txt"))
+
+        cat_model = CatBoostRegressor()
+        cat_model.load_model(f"{ARTIFACT_DIR}/lifetime_catboost.cbm")
+
+        self.models = {"XGBoost": xgb_model, "LightGBM": lgb_booster, "CatBoost": cat_model}
 
     def predict(self, features: dict):
         row = pd.DataFrame([{f: features.get(f, self.feature_defaults[f]) for f in FEATURES}])
